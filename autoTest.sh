@@ -1,97 +1,80 @@
 #!/bin/bash
 
 # WAI Protocol Worker Node 部署脚本（macOS 版）
-# 优化：增加自动重启机制和用户输入保存功能
-# 功能：自动化安装依赖、配置 WAI CLI、直接运行 wai run、永久配置环境变量、修复 PATH 问题
-# 支持系统：macOS（M1、M2、M3、M4）
-# 优化：检测已安装依赖并跳过，Python、Node.js、Yarn 不强制指定版本，环境变量永久生效
-# 作者：基于 WAI Protocol 指南生成，优化为 macOS，直接运行 wai run（前台运行）
+# 注意：此脚本通过 bash <(curl -fsSL URL) 方式运行
+SCRIPT_URL="https://gist.githubusercontent.com/muyi326/4f09a8982f24595b647bbc999ca23d08/raw/autoWai.sh"
 
-# 颜色定义，便于交互界面
+# 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # 无颜色
+NC='\033[0m'
 
 # 配置文件路径
 CONFIG_FILE="$HOME/.wai_install_config"
-# 最大重试次数
 MAX_RETRY=3
-# 当前重试次数
 RETRY_COUNT=0
 
 # 日志函数
-log() {
-    echo -e "${GREEN}[INFO] $1${NC}"
-}
-
-error() {
+log() { echo -e "${GREEN}[INFO] $1${NC}"; }
+error() { 
     echo -e "${RED}[ERROR] $1${NC}"
-    # 保存状态以便重试
     save_config
     if [ $RETRY_COUNT -lt $MAX_RETRY ]; then
         RETRY_COUNT=$((RETRY_COUNT + 1))
         log "将在5秒后重试 (${RETRY_COUNT}/${MAX_RETRY})..."
         sleep 5
-        exec "$0" "$@"  # 重启脚本
+        log "重新下载脚本并执行..."
+        exec bash -c "$(curl -fsSL $SCRIPT_URL)"
     else
         log "已达到最大重试次数 ($MAX_RETRY)，停止重试"
+        cleanup_config
         exit 1
     fi
 }
+warn() { echo -e "${YELLOW}[WARN] $1${NC}"; }
 
-warn() {
-    echo -e "${YELLOW}[WARN] $1${NC}"
-}
-
-# 保存用户配置
+# 配置管理函数
 save_config() {
-    # 保存用户输入值
     echo "USER_CONTINUE=\"$USER_CONTINUE\"" > "$CONFIG_FILE"
     echo "API_KEY=\"$API_KEY\"" >> "$CONFIG_FILE"
-    log "用户配置已保存到 $CONFIG_FILE"
+    echo "RETRY_COUNT=\"$RETRY_COUNT\"" >> "$CONFIG_FILE"
 }
 
-# 加载用户配置
 load_config() {
     if [ -f "$CONFIG_FILE" ]; then
         source "$CONFIG_FILE"
-        log "已加载保存的用户配置"
+        [[ -z "$RETRY_COUNT" ]] && RETRY_COUNT=0
+    else
+        RETRY_COUNT=0
     fi
 }
 
-# 清理配置文件
 cleanup_config() {
-    if [ -f "$CONFIG_FILE" ]; then
-        rm -f "$CONFIG_FILE"
-        log "清理配置文件"
-    fi
+    [ -f "$CONFIG_FILE" ] && rm -f "$CONFIG_FILE"
 }
 
-# 检查 macOS 和 M 系列芯片
+# 系统检查
 check_system() {
-    log "正在检查系统环境..."
-    if [[ "$(uname)" != "Darwin" ]]; then
-        error "此脚本仅支持 macOS 系统，当前系统为 $(uname)"
-    fi
-
+    log "检查系统环境..."
+    [[ "$(uname)" != "Darwin" ]] && error "此脚本仅支持 macOS 系统"
+    
     chip=$(sysctl -n machdep.cpu.brand_string)
     if [[ ! "$chip" =~ "Apple M" ]]; then
-        warn "未检测到 Apple M 系列芯片，当前芯片为 $chip，可能不完全兼容"
+        warn "未检测到 Apple M 系列芯片，当前芯片: $chip"
         
-        # 检查是否有保存的用户选择
         if [ -z "$USER_CONTINUE" ]; then
-            read -p "是否继续运行脚本？(y/n): " USER_CONTINUE
+            read -p "是否继续? (y/n): " USER_CONTINUE
             save_config
         fi
         
-        if [[ "$USER_CONTINUE" != "y" && "$USER_CONTINUE" != "Y" ]]; then
-            warn "用户选择退出安装"
+        [[ "$USER_CONTINUE" != "y" && "$USER_CONTINUE" != "Y" ]] && {
+            warn "用户退出安装"
             cleanup_config
             exit 0
-        fi
+        }
     else
-        log "检测到 Apple M 系列芯片：$chip"
+        log "检测到 Apple M 系列芯片: $chip"
     fi
 }
 
@@ -316,7 +299,6 @@ show_monitor_commands() {
 
 # 主函数
 main() {
-    log "开始部署 WAI Protocol Worker Node（macOS 版）..."
     load_config
     check_system
     install_homebrew
@@ -326,8 +308,8 @@ main() {
     show_monitor_commands
     start_wai
     cleanup_config
-    log "部署完成！WAI Worker 正在运行，请按 Ctrl+C 停止"
+    log "部署完成! WAI Worker 正在运行，按 Ctrl+C 停止"
 }
 
-# 执行主函数
+# 执行入口
 main
