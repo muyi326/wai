@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # WAI Protocol Worker Node 部署脚本（macOS 版）
-# 注意：此脚本通过 bash <(curl -fsSL URL) 方式运行
-SCRIPT_URL="https://gist.githubusercontent.com/muyi326/4f09a8982f24595b647bbc999ca23d08/raw/autoWai.sh"
+# 注意：此脚本通过 bash <(curl -fsSL URL) 方式运行 
+SCRIPT_URL="https://raw.githubusercontent.com/muyi326/wai/refs/heads/main/autoTest.sh"
 
 # 颜色定义
 RED='\033[0;31m'
